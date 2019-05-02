@@ -30,6 +30,7 @@ class PerceptronModel(object):
         Returns: a node containing a single number (the score)
         """
         "*** YOUR CODE HERE ***"
+        return nn.DotProduct(x, self.w)
 
     def get_prediction(self, x):
         """
@@ -38,12 +39,22 @@ class PerceptronModel(object):
         Returns: 1 or -1
         """
         "*** YOUR CODE HERE ***"
+        result = nn.as_scalar(nn.DotProduct(x, self.w))
+        if (result >= 0):
+            return 1
+        return -1
 
     def train(self, dataset):
         """
         Train the perceptron until convergence.
         """
         "*** YOUR CODE HERE ***"
+        batch_size = 1
+        for x, y in dataset.iterate_once(batch_size):
+            print(x)
+            print(y)
+            result_y = self.run(x)
+            self.w.update(y, .2)
 
 
 class RegressionModel(object):
@@ -82,7 +93,7 @@ class RegressionModel(object):
             A node with shape (batch_size x 1) containing predicted y-values
         """
         "*** YOUR CODE HERE ***"
-        self.graph = nn.Graph(
+        self.graph = nn.DataNode(
             [self.w1, self.w2, self.w3, self.b1, self.b2, self.b3])
 
         if y is not None:
@@ -91,8 +102,8 @@ class RegressionModel(object):
             # that the node belongs to. The loss node must be the last node
             # added to the graph.
             "*** YOUR CODE HERE ***"
-            input_x = nn.Input(self.graph, x)
-            input_y = nn.Input(self.graph, y)
+            input_x = nn.Constant(x)
+            input_y = nn.Constant(y)
             xw1 = nn.MatrixMultiply(self.graph, input_x, self.w1)
             xw1_plus_b1 = nn.MatrixVectorAdd(self.graph, xw1, self.b1)
             l1 = nn.ReLU(self.graph, xw1_plus_b1)
