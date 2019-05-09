@@ -39,7 +39,7 @@ class PerceptronModel(object):
         Returns: 1 or -1
         """
         "*** YOUR CODE HERE ***"
-        result = nn.as_scalar(nn.DotProduct(x, self.w))
+        result = nn.as_scalar(self.run(x))
         if (result >= 0):
             return 1
         return -1
@@ -49,12 +49,17 @@ class PerceptronModel(object):
         Train the perceptron until convergence.
         """
         "*** YOUR CODE HERE ***"
-        batch_size = 1
-        for x, y in dataset.iterate_once(batch_size):
-            print(x)
-            print(y)
-            result_y = self.run(x)
-            self.w.update(y, .2)
+        batch_size, cont = 1, True
+        while(cont):
+            result = 0
+            for x, y in dataset.iterate_once(batch_size):
+                if (self.get_prediction(x) == nn.as_scalar(y)):
+                    result += 0
+                else:
+                    self.w.update(x, nn.as_scalar(y))
+                    result += 1
+            if (result == 0):
+                cont = False
 
 
 class RegressionModel(object):
@@ -67,21 +72,15 @@ class RegressionModel(object):
     def __init__(self):
         # Initialize your model parameters here
         "*** YOUR CODE HERE ***"
-        model = object.__init__(self)
-        self.get_data_and_monitor = backend.RegressionDataset(model)
-
         # Remember to set self.learning_rate!
         # You may use any learning rate that works well for your architecture
         "*** YOUR CODE HERE ***"
-        self.learning_rate = 0.1
-        self.hidden_size = 300
+        self.l1b = nn.Parameter(1, 100)
+        self.l1 = nn.Parameter(1, 100)
+        self.two = nn.Parameter(100, 1)
+        self.l2b = nn.Parameter(1, 1)
 
-        self.w1 = nn.Parameter(1, self.hidden_size)
-        self.w2 = nn.Parameter(self.hidden_size, self.hidden_size)
-        self.w3 = nn.Parameter(self.hidden_size, 1)
-        self.b1 = nn.Parameter(self.hidden_size)
-        self.b2 = nn.Parameter(self.hidden_size)
-        self.b3 = nn.Parameter(1)
+        self.multiplier = .01
 
     def run(self, x):
         """
@@ -93,45 +92,9 @@ class RegressionModel(object):
             A node with shape (batch_size x 1) containing predicted y-values
         """
         "*** YOUR CODE HERE ***"
-        self.graph = nn.DataNode(
-            [self.w1, self.w2, self.w3, self.b1, self.b2, self.b3])
-
-        if y is not None:
-            # At training time, the correct output `y` is known.
-            # Here, you should construct a loss node, and return the nn.Graph
-            # that the node belongs to. The loss node must be the last node
-            # added to the graph.
-            "*** YOUR CODE HERE ***"
-            input_x = nn.Constant(x)
-            input_y = nn.Constant(y)
-            xw1 = nn.MatrixMultiply(self.graph, input_x, self.w1)
-            xw1_plus_b1 = nn.MatrixVectorAdd(self.graph, xw1, self.b1)
-            l1 = nn.ReLU(self.graph, xw1_plus_b1)
-            l1w2 = nn.MatrixMultiply(self.graph, l1, self.w2)
-            l2w2_plus_b2 = nn.MatrixVectorAdd(self.graph, l1w2, self.b2)
-            l2 = nn.ReLU(self.graph, l2w2_plus_b2)
-            l2w3 = nn.MatrixMultiply(self.graph, l2, self.w3)
-            l2w3_plus_b3 = nn.MatrixVectorAdd(self.graph, l2w3, self.b3)
-            loss = nn.SquareLoss(self.graph, l2w3_plus_b3, input_y)
-
-            return self.graph
-
-        else:
-            # At test time, the correct output is unknown.
-            # You should instead return your model's prediction as a numpy array
-            "*** YOUR CODE HERE ***"
-            input_x = nn.Input(self.graph, x)
-
-            xw1 = nn.MatrixMultiply(self.graph, input_x, self.w1)
-            xw1_plus_b1 = nn.MatrixVectorAdd(self.graph, xw1, self.b1)
-            l1 = nn.ReLU(self.graph, xw1_plus_b1)
-            l1w2 = nn.MatrixMultiply(self.graph, l1, self.w2)
-            l2w2_plus_b2 = nn.MatrixVectorAdd(self.graph, l1w2, self.b2)
-            l2 = nn.ReLU(self.graph, l2w2_plus_b2)
-            l2w3 = nn.MatrixMultiply(self.graph, l2, self.w3)
-            l2w3_plus_b3 = nn.MatrixVectorAdd(self.graph, l2w3, self.b3)
-
-            return self.graph.get_output(l2w3_plus_b3)
+        # //composition of layers
+        return nn.AddBias(nn.Linear(
+            nn.ReLU(nn.AddBias(nn.Linear(x, self.l1), self.l1b)), self.two), self.l2b)
 
     def get_loss(self, x, y):
         """
@@ -144,12 +107,26 @@ class RegressionModel(object):
         Returns: a loss node
         """
         "*** YOUR CODE HERE ***"
+        pred_y = self.run(x)
+        loss = nn.SquareLoss(pred_y, y)
+        return loss
 
     def train(self, dataset):
         """
         Trains the model.
         """
         "*** YOUR CODE HERE ***"
+        for x, y in dataset.iterate_forever(5):
+            fn_loss = self.get_loss(x, y)
+            if nn.as_scalar(fn_loss) <= 0.000007:
+                break
+            # //get gradients and continuosly udpate weights
+            grad_1, grad_b1, grad_2, grad_b2 = nn.gradients(
+                fn_loss, [self.l1, self.l1b, self.two, self.l2b])
+            self.l1.update(grad_1, -self.multiplier)
+            self.l1b.update(grad_b1, -self.multiplier)
+            self.two.update(grad_2, -self.multiplier)
+            self.l2b.update(grad_b2, -self.multiplier)
 
 
 class DigitClassificationModel(object):
